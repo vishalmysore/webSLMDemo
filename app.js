@@ -34,25 +34,17 @@ const WEBSLM_MODELS = [
     needsCompilation: false,
   },
   {
-    id:    'WebSLM-Custom-MLC',
-    label: 'WebSLM-Custom-MLC ✓ compiled',
+    id:    'WebSLM-Medical-0.5B-MLC',
+    label: 'WebSLM-Medical-0.5B ✓ compiled',
     size:  '~293 MB',
     appConfig: {
       model_list: [{
         model:     'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC',
-        model_id:  'WebSLM-Custom-MLC',
+        model_id:  'WebSLM-Medical-0.5B-MLC',
         model_lib: 'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC/resolve/main/libs/WebSLM-Custom-q4f16_1-webgpu.wasm',
       }],
     },
     needsCompilation: false,
-  },
-  {
-    id:    'WebSLM-Medical-0.5B',
-    label: 'WebSLM-Medical-0.5B (build pending)',
-    size:  'raw — needs MLC build',
-    appConfig: null,
-    needsCompilation: true,
-    compilationNote: 'This model exists on HuggingFace (VishalMysore/WebSLM-Medical-0.5B) but has not been compiled to MLC/WebGPU format yet. Run the webSLM build pipeline (build-slm.yml) to produce browser-ready weight shards and .wasm, then add the compiled MLC repo here.',
   },
 ];
 
