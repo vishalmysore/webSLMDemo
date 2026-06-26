@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>webSLM Demo — RAG vs Fine-tuned Domain AI</title>
+  <style>
+    /* ── Reset & tokens ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1c2128;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --rag:       #f0883e;   /* amber — RAG panel accent */
+      --slm:       #58a6ff;   /* blue  — SLM panel accent */
+      --green:     #3fb950;
+      --red:       #f85149;
+      font-size: 14px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .header-left h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .header-left h1 span.rag-word { color: var(--rag); }
+    .header-left h1 span.slm-word { color: var(--slm); }
+
+    .header-left p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .settings-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .settings-btn:hover { border-color: var(--slm); color: var(--text); }
+
+    /* ── Settings panel ───────────────────────────────────────────── */
+    .settings-panel {
+      display: none;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      flex-shrink: 0;
+    }
+
+    .settings-panel.open { display: flex; align-items: flex-end; gap: 12px; }
+
+    .settings-panel label {
+      font-size: 11px;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .settings-panel .field { flex: 1; }
+
+    .settings-panel input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+    }
+
+    .settings-panel input[type="text"]:focus {
+      outline: none;
+      border-color: var(--slm);
+    }
+
+    .load-btn {
+      background: var(--slm);
+      color: #0d1117;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .load-btn:hover { opacity: 0.85; }
+
+    .settings-note {
+      font-size: 11px;
+      color: var(--muted);
+      align-self: center;
+      flex-shrink: 0;
+      max-width: 260px;
+    }
+
+    /* ── Query bar ────────────────────────────────────────────────── */
+    .query-bar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .domain-select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .query-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .query-input:focus { outline: none; border-color: var(--slm); }
+    .query-input::placeholder { color: var(--muted); }
+
+    .send-btn {
+      background: var(--slm);
+      color: #0d1117;
+      border: none;
+      padding: 9px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .send-btn:hover:not(:disabled) { opacity: 0.85; }
+    .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── Examples ─────────────────────────────────────────────────── */
+    .examples-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 24px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .examples-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .example-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .example-btn:hover { border-color: var(--rag); color: var(--text); }
+
+    /* ── Comparison panels ────────────────────────────────────────── */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border-right: 1px solid var(--border);
+    }
+
+    .panel:last-child { border-right: none; }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 99px;
+    }
+
+    .badge-rag { background: rgba(240,136,62,0.15); color: var(--rag); }
+    .badge-slm { background: rgba(88,166,255,0.15); color: var(--slm); }
+
+    .panel-title { font-size: 14px; font-weight: 600; }
+    .panel-subtitle { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    /* ── Model status strip ───────────────────────────────────────── */
+    .status-strip {
+      padding: 8px 18px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .status-text { font-size: 12px; color: var(--muted); }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 99px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .fill-rag { background: var(--rag); }
+    .fill-slm { background: var(--slm); }
+
+    /* ── Scroll area ──────────────────────────────────────────────── */
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Retrieved docs ───────────────────────────────────────────── */
+    .retrieved-section {
+      border: 1px solid rgba(240,136,62,0.3);
+      border-radius: 8px;
+      padding: 12px;
+      background: rgba(240,136,62,0.05);
+    }
+
+    .retrieved-heading {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--rag);
+      margin-bottom: 8px;
+    }
+
+    .doc-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+
+    .doc-chip:last-child { margin-bottom: 0; }
+
+    .doc-chip-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .doc-title { font-weight: 600; font-size: 12px; color: var(--rag); }
+    .doc-score { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .doc-snippet { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+
+    .no-docs { font-size: 12px; color: var(--muted); font-style: italic; }
+
+    /* ── Chat messages ────────────────────────────────────────────── */
+    .chat-message { display: flex; }
+    .chat-message.user { justify-content: flex-end; }
+    .chat-message.assistant { justify-content: flex-start; }
+
+    .chat-bubble {
+      max-width: 88%;
+      padding: 9px 13px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .user .chat-bubble {
+      background: var(--slm);
+      color: #0d1117;
+      border-radius: 14px 14px 3px 14px;
+    }
+
+    .assistant .chat-bubble {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 14px 14px 14px 3px;
+    }
+
+    /* ── Thinking animation ───────────────────────────────────────── */
+    .thinking-bubble {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      padding: 12px 16px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: bounce 1.3s infinite ease-in-out;
+    }
+
+    .dot:nth-child(2) { animation-delay: 0.18s; }
+    .dot:nth-child(3) { animation-delay: 0.36s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-7px); opacity: 1; }
+    }
+
+    /* ── Scrollbar ────────────────────────────────────────────────── */
+    .panel-body::-webkit-scrollbar { width: 5px; }
+    .panel-body::-webkit-scrollbar-track { background: transparent; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-left">
+    <h1>webSLM Demo &mdash; <span class="rag-word">Base + RAG</span> vs <span class="slm-word">Fine-tuned SLM</span></h1>
+    <p>100% in-browser inference via WebGPU &bull; No server required &bull; Powered by WebLLM &amp; MLC-LLM</p>
+  </div>
+  <button class="settings-btn" id="settingsToggle">&#9881; Settings</button>
+</header>
+
+<!-- ── Settings ────────────────────────────────────────────────────────── -->
+<div class="settings-panel" id="settingsPanel">
+  <div class="field">
+    <label>Custom webSLM Model Config URL (Option 2)</label>
+    <input type="text" id="customModelUrl"
+      placeholder="https://huggingface.co/your-org/webSLM-model/resolve/main/mlc-chat-config.json" />
+  </div>
+  <button class="load-btn" id="loadCustomBtn">Load Model</button>
+  <p class="settings-note">Leave blank to use the base Qwen2.5-1.5B model with a domain-tuned system prompt. Provide your compiled webSLM config URL to load the real fine-tuned model.</p>
+</div>
+
+<!-- ── Query bar ───────────────────────────────────────────────────────── -->
+<div class="query-bar">
+  <select class="domain-select" id="domainSelect">
+    <option value="insurance">&#128178; Insurance</option>
+    <option value="medical">&#10133; Medical</option>
+    <option value="legal">&#9878; Legal</option>
+  </select>
+  <input class="query-input" id="queryInput" type="text"
+    placeholder="Ask a domain question and compare how each approach responds…" />
+  <button class="send-btn" id="sendBtn" disabled>Send</button>
+</div>
+
+<!-- ── Example queries ─────────────────────────────────────────────────── -->
+<div class="examples-bar">
+  <span class="examples-label">Try:</span>
+  <div id="exampleBtns"></div>
+</div>
+
+<!-- ── Side-by-side comparison ─────────────────────────────────────────── -->
+<div class="comparison">
+
+  <!-- Left: Base Model + RAG -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="badge badge-rag">Option 1</span>
+      <div>
+        <div class="panel-title">Base Qwen2.5-1.5B + RAG</div>
+        <div class="panel-subtitle">General model &bull; Documents retrieved and injected into context</div>
+      </div>
+    </div>
+    <div class="status-strip">
+      <div class="status-text" id="statusRAG">Initialising…</div>
+      <div class="progress-bar">
+        <div class="progress-fill fill-rag" id="progressRAG"></div>
+      </div>
+    </div>
+    <div class="panel-body" id="historyRAG">
+      <!-- Retrieved docs rendered here by app.js -->
+      <div id="retrievedDocs"></div>
+    </div>
+  </div>
+
+  <!-- Right: Fine-tuned webSLM -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="badge badge-slm">Option 2</span>
+      <div>
+        <div class="panel-title">Fine-tuned webSLM</div>
+        <div class="panel-subtitle">Domain-specialized model &bull; No retrieval &bull; Behaviour baked in during training</div>
+      </div>
+    </div>
+    <div class="status-strip">
+      <div class="status-text" id="statusSLM">Initialising…</div>
+      <div class="progress-bar">
+        <div class="progress-fill fill-slm" id="progressSLM"></div>
+      </div>
+    </div>
+    <div class="panel-body" id="historySLM"></div>
+  </div>
+
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

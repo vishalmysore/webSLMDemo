@@ -1,0 +1,168 @@
+{
+  "insurance": [
+    {
+      "id": "ins_001",
+      "title": "Comprehensive Auto Coverage",
+      "content": "Comprehensive auto insurance covers vehicle damage from non-collision events including theft, vandalism, fire, hail, flooding, and animal strikes. It does not cover collision damage, which requires separate collision coverage. Policyholders choose a deductible—the amount paid out of pocket before insurance applies—typically ranging from $100 to $1,500."
+    },
+    {
+      "id": "ins_002",
+      "title": "Collision Coverage",
+      "content": "Collision coverage pays to repair or replace your vehicle after an accident with another car or object, regardless of fault. Like comprehensive, it requires a deductible. Collision is optional for older vehicles but is often required by lenders for financed or leased cars."
+    },
+    {
+      "id": "ins_003",
+      "title": "Homeowners Insurance Basics",
+      "content": "Standard homeowners insurance (HO-3 policy) covers the dwelling structure, personal property, liability, and additional living expenses if the home becomes uninhabitable. It covers perils like fire, wind, hail, theft, and vandalism. Flood and earthquake damage are not included and require separate policies."
+    },
+    {
+      "id": "ins_004",
+      "title": "Health Insurance Deductible and Copay",
+      "content": "A deductible is the amount you pay for covered healthcare services before your insurance begins to pay. With a $2,000 deductible, you pay the first $2,000 of covered services each year. After meeting your deductible, you share costs through copays or coinsurance until you reach your out-of-pocket maximum."
+    },
+    {
+      "id": "ins_005",
+      "title": "Term vs Whole Life Insurance",
+      "content": "Term life insurance provides coverage for a specific period (10, 20, or 30 years) and pays a death benefit only if the insured dies during the term. It is generally less expensive. Whole life insurance provides permanent coverage and includes a cash value component that grows over time at a guaranteed rate."
+    },
+    {
+      "id": "ins_006",
+      "title": "Liability Coverage Explained",
+      "content": "Liability insurance protects you from financial loss if you are found legally responsible for injuring someone or damaging their property. Auto liability is required in most states and covers bodily injury and property damage to others. Homeowners liability protects against claims from accidents occurring on your property."
+    },
+    {
+      "id": "ins_007",
+      "title": "How to File an Insurance Claim",
+      "content": "To file a claim, contact your insurer promptly after an incident, document the damage with photos, and gather relevant information including dates, parties involved, and police reports if applicable. The insurer assigns a claims adjuster to evaluate the damage. Your deductible is subtracted from any settlement amount."
+    },
+    {
+      "id": "ins_008",
+      "title": "Flood Insurance Requirements",
+      "content": "Standard homeowners and renters insurance policies do not cover flood damage. Flood insurance is available through the National Flood Insurance Program (NFIP) or private insurers and covers building damage and personal belongings separately. There is typically a 30-day waiting period before coverage takes effect."
+    },
+    {
+      "id": "ins_009",
+      "title": "Umbrella Insurance Policy",
+      "content": "An umbrella policy provides additional liability coverage beyond the limits of your home and auto insurance. It activates once underlying policy limits are exhausted. Umbrella policies typically offer $1 million to $5 million in coverage and cost approximately $150 to $300 per year for the first million."
+    },
+    {
+      "id": "ins_010",
+      "title": "Uninsured and Underinsured Motorist Coverage",
+      "content": "Uninsured motorist coverage pays for your injuries and property damage if you are hit by a driver with no insurance. Underinsured motorist coverage applies when the at-fault driver's limits are insufficient to cover your losses. Both coverages are required in some states and strongly recommended in others."
+    },
+    {
+      "id": "ins_011",
+      "title": "Renters Insurance Coverage",
+      "content": "Renters insurance covers personal belongings against theft, fire, water damage, and other named perils. It also provides liability protection if someone is injured in your rented space. The average cost is $15 to $30 per month. Your landlord's policy covers the building structure but not your personal possessions."
+    },
+    {
+      "id": "ins_012",
+      "title": "What Affects Your Insurance Premium",
+      "content": "Insurance premiums are determined by claims history, credit score in most states, location, age, coverage amounts, and chosen deductibles. Maintaining a clean claims record, bundling policies with the same insurer, and selecting higher deductibles can meaningfully lower premiums. Insurers use actuarial data to assess and price risk."
+    }
+  ],
+  "medical": [
+    {
+      "id": "med_001",
+      "title": "Type 2 Diabetes Overview",
+      "content": "Type 2 diabetes is a chronic condition where the body does not use insulin properly, leading to elevated blood sugar levels. Common symptoms include increased thirst, frequent urination, fatigue, blurred vision, and slow-healing wounds. Management typically involves lifestyle changes, blood sugar monitoring, and medications such as metformin."
+    },
+    {
+      "id": "med_002",
+      "title": "Hypertension Management Guidelines",
+      "content": "Hypertension is defined as systolic pressure above 130 mm Hg or diastolic above 80 mm Hg. It is managed through lifestyle modifications including reduced sodium intake, regular exercise, weight loss, and limiting alcohol, as well as medications such as ACE inhibitors, beta-blockers, calcium channel blockers, and diuretics."
+    },
+    {
+      "id": "med_003",
+      "title": "Emergency Warning Signs",
+      "content": "Seek emergency care immediately for chest pain or pressure, sudden severe headache, difficulty breathing, sudden weakness or numbness on one side of the face or body, sudden vision loss, uncontrolled bleeding, or loss of consciousness. These may indicate heart attack, stroke, pulmonary embolism, or other life-threatening conditions."
+    },
+    {
+      "id": "med_004",
+      "title": "Common Drug Interactions to Know",
+      "content": "Important drug interactions include: blood thinners like warfarin with aspirin, NSAIDs, or antibiotics; statins with certain antibiotics or antifungals; SSRIs with MAOIs or tramadol; and ACE inhibitors with potassium supplements. Always inform your pharmacist and physician of all medications, including supplements and herbal products."
+    },
+    {
+      "id": "med_005",
+      "title": "Recommended Preventive Screenings",
+      "content": "Recommended screenings include blood pressure checks for adults 18 and older, cholesterol testing from age 35 or earlier with risk factors, colorectal cancer screening from age 45, mammography for women starting at 40 to 50 depending on guidelines, and diabetes screening from age 45 or with risk factors."
+    },
+    {
+      "id": "med_006",
+      "title": "Ibuprofen Usage and Safety",
+      "content": "Ibuprofen (Advil, Motrin) is an NSAID used for pain, fever, and inflammation. Standard adult dosage is 200 to 400 mg every 4 to 6 hours, not exceeding 1,200 mg per day for OTC use. Take with food to reduce stomach upset. Avoid in people with kidney disease, peptic ulcers, or those on blood thinners."
+    },
+    {
+      "id": "med_007",
+      "title": "Statin Medications and Side Effects",
+      "content": "Statins including atorvastatin, rosuvastatin, and simvastatin are cholesterol-lowering medications. Common side effects include muscle aches, weakness, and digestive issues. Rare but serious effects include rhabdomyolysis and elevated liver enzymes. Patients should report persistent muscle pain and have liver function monitored regularly."
+    },
+    {
+      "id": "med_008",
+      "title": "Mental Health: When to Seek Help",
+      "content": "Seek professional mental health support if symptoms persist more than two weeks, interfere with daily functioning, or include thoughts of self-harm. Effective treatments include cognitive behavioral therapy, medication such as SSRIs and SNRIs, and lifestyle interventions. Primary care physicians can provide referrals to mental health specialists."
+    },
+    {
+      "id": "med_009",
+      "title": "Antibiotic Use and Resistance",
+      "content": "Antibiotics treat bacterial infections but are completely ineffective against viral infections like colds, flu, and COVID-19. Completing the full antibiotic course is essential to prevent antibiotic resistance and recurrence. Never use leftover antibiotics or antibiotics prescribed for someone else."
+    },
+    {
+      "id": "med_010",
+      "title": "Chronic Pain Management Approaches",
+      "content": "Chronic pain is typically managed through a multimodal approach including physical therapy, medications such as NSAIDs, anticonvulsants, and antidepressants, psychological therapy, and complementary approaches. Opioids are generally reserved for severe pain when other treatments have failed due to significant risks of dependence and side effects."
+    }
+  ],
+  "legal": [
+    {
+      "id": "leg_001",
+      "title": "Statute of Limitations for Personal Injury",
+      "content": "The statute of limitations for personal injury lawsuits varies by state, typically 2 to 3 years from the date of injury. This deadline is strictly enforced; missing it generally bars filing a claim entirely. Exceptions may apply for minors, latent injury discovery, or claims against government entities which often have shorter notice requirements of 30 to 180 days."
+    },
+    {
+      "id": "leg_002",
+      "title": "Elements of Breach of Contract",
+      "content": "To prove breach of contract, a plaintiff must establish: a valid contract with offer, acceptance, and consideration; that the plaintiff performed their obligations; that the defendant failed to perform theirs; and that the plaintiff suffered damages as a direct result. Verbal contracts can be enforceable but are significantly harder to prove."
+    },
+    {
+      "id": "leg_003",
+      "title": "Tenant Rights and Habitability",
+      "content": "Landlords are legally required to maintain rental properties in a habitable condition, including functional heating, plumbing, and electrical systems, and freedom from pest infestations and significant mold. If landlords fail to make repairs after written notice, tenants may have rights to withhold rent, repair-and-deduct, or terminate the lease depending on state law."
+    },
+    {
+      "id": "leg_004",
+      "title": "Workplace Privacy and Email Monitoring",
+      "content": "In the United States, employers generally have the legal right to monitor employee email and internet usage on company systems and networks. The Electronic Communications Privacy Act permits employer monitoring when employees are notified through an acceptable use policy. Employees have reduced privacy expectations on company-owned devices and networks."
+    },
+    {
+      "id": "leg_005",
+      "title": "Small Claims Court Overview",
+      "content": "Small claims courts handle disputes involving relatively small sums, with limits ranging from $2,500 to $25,000 depending on the state. Procedures are simplified and parties typically represent themselves. Common cases include unpaid debts, security deposit disputes, minor property damage, and consumer complaints. Filing fees are modest, typically $30 to $100."
+    },
+    {
+      "id": "leg_006",
+      "title": "At-Will Employment",
+      "content": "Most U.S. employment is at-will, meaning employers can terminate employees for any reason or no reason without notice, except for legally prohibited reasons such as discrimination or retaliation for protected activity. Exceptions include written employment contracts, union agreements, and implied contracts created by employer conduct."
+    },
+    {
+      "id": "leg_007",
+      "title": "Copyright and Fair Use",
+      "content": "Copyright protects original creative works from the moment of creation for the author's life plus 70 years. Registration is not required for protection but strengthens legal remedies available in court. Fair use doctrine allows limited use of copyrighted material for education, commentary, criticism, and news reporting without requiring permission."
+    },
+    {
+      "id": "leg_008",
+      "title": "Power of Attorney Basics",
+      "content": "A power of attorney authorizes someone (the agent) to act on behalf of another person (the principal). A general POA covers broad financial and legal matters; a healthcare POA covers medical decisions. A durable POA remains effective if the principal becomes incapacitated. POAs must typically be notarized and witnessed to be valid."
+    },
+    {
+      "id": "leg_009",
+      "title": "Consumer Protection and Lemon Laws",
+      "content": "Lemon laws protect consumers who purchase defective vehicles. If a new car has a substantial defect that cannot be repaired after a reasonable number of attempts, the manufacturer may be required to replace or refund the vehicle. The Magnuson-Moss Warranty Act provides federal protections alongside each state's own lemon law."
+    },
+    {
+      "id": "leg_010",
+      "title": "Non-Disclosure Agreements",
+      "content": "A non-disclosure agreement (NDA) is a legally binding contract that establishes confidentiality between parties. NDAs are commonly used to protect trade secrets, business plans, and proprietary information during negotiations or employment. Overly broad NDAs that restrict reporting illegal activity may be unenforceable depending on jurisdiction."
+    }
+  ]
+}
