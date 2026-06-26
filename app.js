@@ -1,20 +1,60 @@
 /**
  * app.js — webSLMDemo main application
  *
- * Uses a SINGLE WebLLM engine to compare:
- *   Option 1 — Base Qwen2.5-1.5B + TF-IDF RAG (document-grounded)
- *   Option 2 — Same base model with domain-tuned system prompt
- *              (or a custom compiled webSLM model if a config URL is provided)
+ * Option 1 — Base model (user-selectable) + TF-IDF RAG (document-grounded)
+ * Option 2 — Fine-tuned webSLM model or domain-prompted base model
  *
- * Queries run sequentially through one engine to stay within browser GPU memory.
+ * Two separate MLCEngine instances are used when different models are selected.
+ * Queries run sequentially to stay within browser GPU memory limits.
  */
 
 import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 import { TFIDFRetriever } from "./rag.js";
 
-// ── Configuration ────────────────────────────────────────────────────────────
+// ── Base model list (Option 1 — RAG panel) ───────────────────────────────────
+// IDs match WebLLM's built-in model registry. No appConfig needed.
 
-const BASE_MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
+const BASE_MODELS = [
+  { id: 'Qwen2-0.5B-Instruct-q4f16_1-MLC',   label: 'Qwen2 0.5B ✓ recommended', size: '~400 MB', safe: true  },
+  { id: 'Llama-3.2-1B-Instruct-q4f32_1-MLC', label: 'Llama 3.2 1B',             size: '~0.9 GB', safe: true  },
+  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', label: 'Qwen2.5 1.5B',             size: '~1.1 GB', safe: true  },
+  { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', label: '⚠ Llama 3.2 3B',          size: '~2 GB',   safe: false },
+];
+
+// ── webSLM model list (Option 2 — fine-tuned SLM panel) ──────────────────────
+// Custom models use appConfig to provide the HF model URL + compiled .wasm lib.
+// Models marked needsCompilation=true cannot be loaded yet; a note is shown.
+
+const WEBSLM_MODELS = [
+  {
+    id:    'Qwen2-0.5B-Instruct-q4f16_1-MLC',
+    label: 'Qwen2 0.5B (domain-prompted base)',
+    size:  '~400 MB',
+    appConfig: null,
+    needsCompilation: false,
+  },
+  {
+    id:    'WebSLM-Custom-MLC',
+    label: 'WebSLM-Custom-MLC ✓ compiled',
+    size:  '~293 MB',
+    appConfig: {
+      model_list: [{
+        model:     'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC',
+        model_id:  'WebSLM-Custom-MLC',
+        model_lib: 'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC/resolve/main/libs/WebSLM-Custom-q4f16_1-webgpu.wasm',
+      }],
+    },
+    needsCompilation: false,
+  },
+  {
+    id:    'WebSLM-Medical-0.5B',
+    label: 'WebSLM-Medical-0.5B (build pending)',
+    size:  'raw — needs MLC build',
+    appConfig: null,
+    needsCompilation: true,
+    compilationNote: 'This model exists on HuggingFace (VishalMysore/WebSLM-Medical-0.5B) but has not been compiled to MLC/WebGPU format yet. Run the webSLM build pipeline (build-slm.yml) to produce browser-ready weight shards and .wasm, then add the compiled MLC repo here.',
+  },
+];
 
 const DOMAIN_EXAMPLES = {
   insurance: [
@@ -45,12 +85,14 @@ const DOMAIN_SYSTEM_PROMPTS = {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let engine = null;         // Shared WebLLM engine (base model)
-let engineSLM = null;      // Optional second engine for custom fine-tuned model
+let engine    = null;   // Base model engine (Option 1 RAG)
+let engineSLM = null;   // webSLM engine (Option 2); null means reuse engine
 let retriever = null;
 let knowledgeBase = {};
 let currentDomain = "insurance";
-let isGenerating = false;
+let isGenerating  = false;
+let baseReady  = false;
+let webslmReady = false;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
@@ -65,22 +107,32 @@ const progressSLM  = $("progressSLM");
 const historyRAG   = $("historyRAG");
 const historySLM   = $("historySLM");
 const retrievedDocs = $("retrievedDocs");
-const exampleBtns  = $("exampleBtns");
+const exampleBtns   = $("exampleBtns");
 const settingsToggle = $("settingsToggle");
 const settingsPanel  = $("settingsPanel");
-const customModelUrl = $("customModelUrl");
-const loadCustomBtn  = $("loadCustomBtn");
+// Base model controls
+const baseModelSelect  = $("baseModelSelect");
+const loadBaseBtn      = $("loadBaseBtn");
+const baseModelNote    = $("baseModelNote");
+const baseModelProg    = $("baseModelProg");
+// webSLM model controls
+const webslmModelSelect = $("webslmModelSelect");
+const loadWebslmBtn     = $("loadWebslmBtn");
+const webslmModelNote   = $("webslmModelNote");
+const webslmModelProg   = $("webslmModelProg");
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
   // Check WebGPU availability
   if (!navigator.gpu) {
-    const msg = "WebGPU is not supported in this browser. Please use Chrome 113+, Edge 113+, or Firefox Nightly with WebGPU enabled.";
+    const msg = "WebGPU not supported — use Chrome 113+, Edge 113+, or Firefox Nightly with WebGPU enabled.";
     statusRAG.textContent = msg;
     statusSLM.textContent = msg;
     statusRAG.style.color = "#ef4444";
     statusSLM.style.color = "#ef4444";
+    loadBaseBtn.disabled  = true;
+    loadWebslmBtn.disabled = true;
     return;
   }
 
@@ -89,15 +141,65 @@ async function init() {
   knowledgeBase = await res.json();
   retriever = new TFIDFRetriever(knowledgeBase[currentDomain] || []);
 
+  // Populate base model dropdown
+  BASE_MODELS.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = `${m.label} (${m.size})`;
+    baseModelSelect.appendChild(opt);
+  });
+  baseModelSelect.disabled = false;
+  updateBaseModelNote();
+
+  // Populate webSLM model dropdown
+  WEBSLM_MODELS.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = `${m.label} (${m.size})`;
+    webslmModelSelect.appendChild(opt);
+  });
+  webslmModelSelect.disabled = false;
+  updateWebslmModelNote();
+
   // Render example queries
   renderExamples(currentDomain);
 
-  // Wire up controls
+  // Settings toggle
   settingsToggle.addEventListener("click", () =>
     settingsPanel.classList.toggle("open")
   );
 
-  loadCustomBtn.addEventListener("click", loadCustomModel);
+  // Open settings on first load so users see the model selectors
+  settingsPanel.classList.add("open");
+
+  // Base model selector change
+  baseModelSelect.addEventListener("change", () => {
+    if (engine) {
+      engine.unload?.();
+      engine = null;
+      baseReady = false;
+      statusRAG.textContent = "Model changed — click Load to reload.";
+      progressRAG.style.width = "0%";
+      updateSendBtn();
+    }
+    updateBaseModelNote();
+  });
+
+  // webSLM model selector change
+  webslmModelSelect.addEventListener("change", () => {
+    if (engineSLM) {
+      engineSLM.unload?.();
+      engineSLM = null;
+      webslmReady = false;
+      statusSLM.textContent = "Model changed — click Load to reload.";
+      progressSLM.style.width = "0%";
+      updateSendBtn();
+    }
+    updateWebslmModelNote();
+  });
+
+  loadBaseBtn.addEventListener("click", loadBaseModel);
+  loadWebslmBtn.addEventListener("click", loadWebslmModel);
 
   domainSelect.addEventListener("change", e => {
     currentDomain = e.target.value;
@@ -112,62 +214,132 @@ async function init() {
   queryInput.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) handleSend();
   });
-
-  // Load base model (used for both panels unless custom model provided)
-  await loadBaseModel();
 }
 
-async function loadBaseModel() {
-  const onProgress = report => {
-    const pct = Math.round((report.progress || 0) * 100);
-    statusRAG.textContent = report.text;
-    statusSLM.textContent = report.text;
-    progressRAG.style.width = pct + "%";
-    progressSLM.style.width = pct + "%";
-  };
+function updateSendBtn() {
+  sendBtn.disabled = !(baseReady && webslmReady) || isGenerating;
+}
 
-  try {
-    statusRAG.textContent = "Loading Qwen2.5-1.5B…";
-    statusSLM.textContent = "Loading Qwen2.5-1.5B…";
-    engine = new webllm.MLCEngine();
-    await engine.reload(BASE_MODEL_ID, { initProgressCallback: onProgress });
-    statusRAG.textContent = "✓ Ready — Qwen2.5-1.5B + RAG";
-    statusSLM.textContent = "✓ Ready — Qwen2.5-1.5B (domain-tuned prompt)";
-    progressRAG.style.width = "100%";
-    progressSLM.style.width = "100%";
-    sendBtn.disabled = false;
-  } catch (err) {
-    const msg = `Failed to load model: ${err.message}`;
-    statusRAG.textContent = msg;
-    statusSLM.textContent = msg;
-    statusRAG.style.color = "#ef4444";
-    statusSLM.style.color = "#ef4444";
-    console.error(err);
+function updateBaseModelNote() {
+  const m = BASE_MODELS.find(x => x.id === baseModelSelect.value);
+  if (!m) return;
+  baseModelNote.textContent = m.safe ? "" : `⚠ ${m.size} — needs a dedicated GPU with enough VRAM. If it crashes, switch to Qwen2 0.5B.`;
+  baseModelNote.style.color = m.safe ? "" : "#f59e0b";
+}
+
+function updateWebslmModelNote() {
+  const m = WEBSLM_MODELS.find(x => x.id === webslmModelSelect.value);
+  if (!m) return;
+  if (m.needsCompilation) {
+    webslmModelNote.textContent = m.compilationNote;
+    webslmModelNote.style.color = "#f59e0b";
+    loadWebslmBtn.disabled = true;
+  } else {
+    webslmModelNote.textContent = m.appConfig
+      ? `Custom compiled webSLM model — loads from HuggingFace (VishalMysore/WebSLM-Custom-MLC).`
+      : `Base model with domain-specialized system prompt. No separate download — shares base engine.`;
+    webslmModelNote.style.color = "#8b949e";
+    loadWebslmBtn.disabled = false;
   }
 }
 
-async function loadCustomModel() {
-  const url = customModelUrl.value.trim();
-  if (!url) return;
-  statusSLM.textContent = "Loading custom webSLM model…";
-  progressSLM.style.width = "0%";
+async function loadBaseModel() {
+  const modelId = baseModelSelect.value;
+  const modelMeta = BASE_MODELS.find(m => m.id === modelId) || BASE_MODELS[0];
+  loadBaseBtn.disabled = true;
+  baseReady = false;
+  updateSendBtn();
+  statusRAG.textContent = `Loading ${modelMeta.label}…`;
+  progressRAG.style.width = "0%";
+  statusRAG.style.color = "";
+
+  const onProgress = report => {
+    statusRAG.textContent = report.text;
+    progressRAG.style.width = Math.round((report.progress || 0) * 100) + "%";
+    baseModelProg.textContent = report.text;
+  };
+
   try {
-    const configRes = await fetch(url);
-    if (!configRes.ok) throw new Error(`HTTP ${configRes.status}`);
-    const modelConfig = await configRes.json();
-    engineSLM = new webllm.MLCEngine();
-    await engineSLM.reload(modelConfig, {
-      initProgressCallback: report => {
-        statusSLM.textContent = report.text;
-        progressSLM.style.width = Math.round((report.progress || 0) * 100) + "%";
-      },
-    });
-    statusSLM.textContent = "✓ Ready — Custom webSLM model";
-    progressSLM.style.width = "100%";
+    if (engine) { engine.unload?.(); engine = null; }
+    engine = new webllm.MLCEngine();
+    await engine.reload(modelId, { initProgressCallback: onProgress });
+    statusRAG.textContent = `✓ ${modelMeta.label} + RAG`;
+    progressRAG.style.width = "100%";
+    baseModelProg.textContent = "";
+    baseReady = true;
+
+    // If webSLM model is the same built-in model, mark it ready too (shared engine)
+    const wm = WEBSLM_MODELS.find(x => x.id === webslmModelSelect.value);
+    if (wm && !wm.needsCompilation && !wm.appConfig && wm.id === modelId) {
+      engineSLM = null;
+      webslmReady = true;
+      statusSLM.textContent = `✓ ${modelMeta.label} (domain-tuned prompt)`;
+      progressSLM.style.width = "100%";
+    }
+    updateSendBtn();
   } catch (err) {
-    statusSLM.textContent = `Custom model failed: ${err.message}`;
-    statusSLM.style.color = "#ef4444";
+    statusRAG.textContent = `Failed: ${err.message}`;
+    statusRAG.style.color = "#ef4444";
+    baseModelProg.textContent = "";
+    console.error(err);
+  } finally {
+    loadBaseBtn.disabled = false;
+  }
+}
+
+async function loadWebslmModel() {
+  const wm = WEBSLM_MODELS.find(x => x.id === webslmModelSelect.value);
+  if (!wm || wm.needsCompilation) return;
+
+  // Same built-in model as base — share the engine, no extra download
+  if (!wm.appConfig) {
+    if (!baseReady) {
+      webslmModelNote.textContent = "Load the base model first.";
+      webslmModelNote.style.color = "#f59e0b";
+      return;
+    }
     engineSLM = null;
+    webslmReady = true;
+    const bm = BASE_MODELS.find(m => m.id === baseModelSelect.value) || BASE_MODELS[0];
+    statusSLM.textContent = `✓ ${bm.label} (domain-tuned prompt)`;
+    progressSLM.style.width = "100%";
+    updateSendBtn();
+    return;
+  }
+
+  // Custom compiled webSLM model — load with appConfig
+  loadWebslmBtn.disabled = true;
+  webslmReady = false;
+  updateSendBtn();
+  statusSLM.textContent = `Loading ${wm.label}…`;
+  progressSLM.style.width = "0%";
+  statusSLM.style.color = "";
+
+  const onProgress = report => {
+    statusSLM.textContent = report.text;
+    progressSLM.style.width = Math.round((report.progress || 0) * 100) + "%";
+    webslmModelProg.textContent = report.text;
+  };
+
+  try {
+    if (engineSLM) { engineSLM.unload?.(); engineSLM = null; }
+    engineSLM = new webllm.MLCEngine();
+    await engineSLM.reload(wm.id, {
+      appConfig: wm.appConfig,
+      initProgressCallback: onProgress,
+    });
+    statusSLM.textContent = `✓ ${wm.label}`;
+    progressSLM.style.width = "100%";
+    webslmModelProg.textContent = "";
+    webslmReady = true;
+    updateSendBtn();
+  } catch (err) {
+    statusSLM.textContent = `Failed: ${err.message}`;
+    statusSLM.style.color = "#ef4444";
+    webslmModelProg.textContent = "";
+    console.error(err);
+  } finally {
+    loadWebslmBtn.disabled = false;
   }
 }
 
@@ -175,7 +347,7 @@ async function loadCustomModel() {
 
 async function handleSend() {
   const query = queryInput.value.trim();
-  if (!query || isGenerating || !engine) return;
+  if (!query || isGenerating || !baseReady) return;
 
   isGenerating = true;
   sendBtn.disabled = true;
@@ -226,6 +398,7 @@ async function handleSend() {
 
   isGenerating = false;
   sendBtn.disabled = false;
+  updateSendBtn();
 }
 
 async function streamResponse(eng, messages, historyEl, thinkingEl) {

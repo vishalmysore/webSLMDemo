@@ -78,57 +78,81 @@
       border-bottom: 1px solid var(--border);
       padding: 14px 24px;
       flex-shrink: 0;
+      gap: 24px;
     }
 
-    .settings-panel.open { display: flex; align-items: flex-end; gap: 12px; }
+    .settings-panel.open { display: flex; flex-wrap: wrap; align-items: flex-start; }
 
-    .settings-panel label {
-      font-size: 11px;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 5px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .model-section {
+      flex: 1;
+      min-width: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
-    .settings-panel .field { flex: 1; }
+    .model-section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
 
-    .settings-panel input[type="text"] {
-      width: 100%;
+    .model-section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .model-section select {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 7px 12px;
+      padding: 7px 10px;
       border-radius: 6px;
-      font-size: 13px;
-      font-family: "SFMono-Regular", Consolas, monospace;
-    }
-
-    .settings-panel input[type="text"]:focus {
-      outline: none;
-      border-color: var(--slm);
-    }
-
-    .load-btn {
-      background: var(--slm);
-      color: #0d1117;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 12px;
       cursor: pointer;
-      white-space: nowrap;
     }
 
-    .load-btn:hover { opacity: 0.85; }
+    .model-section select:disabled { opacity: 0.4; cursor: not-allowed; }
+    .model-section select:focus { outline: none; border-color: var(--slm); }
 
-    .settings-note {
+    .model-note {
       font-size: 11px;
       color: var(--muted);
-      align-self: center;
+      line-height: 1.45;
+      min-height: 14px;
+    }
+
+    .model-load-btn {
+      border: none;
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      align-self: flex-start;
+      transition: opacity 0.15s;
+    }
+
+    .model-load-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .model-load-btn:hover:not(:disabled) { opacity: 0.85; }
+
+    .load-btn-rag { background: var(--rag);  color: #0d1117; }
+    .load-btn-slm { background: var(--slm);  color: #0d1117; }
+
+    .model-prog-text {
+      font-size: 11px;
+      color: var(--muted);
+      min-height: 14px;
+      word-break: break-all;
+    }
+
+    .settings-divider {
+      width: 1px;
+      background: var(--border);
+      align-self: stretch;
       flex-shrink: 0;
-      max-width: 260px;
     }
 
     /* ── Query bar ────────────────────────────────────────────────── */
@@ -404,13 +428,33 @@
 
 <!-- ── Settings ────────────────────────────────────────────────────────── -->
 <div class="settings-panel" id="settingsPanel">
-  <div class="field">
-    <label>Custom webSLM Model Config URL (Option 2)</label>
-    <input type="text" id="customModelUrl"
-      placeholder="https://huggingface.co/your-org/webSLM-model/resolve/main/mlc-chat-config.json" />
+
+  <!-- Base model (Option 1 RAG) -->
+  <div class="model-section">
+    <div class="model-section-header">
+      <span class="badge badge-rag">Option 1</span>
+      <span class="model-section-title">Base Model — RAG panel</span>
+    </div>
+    <select id="baseModelSelect" disabled></select>
+    <div id="baseModelNote" class="model-note"></div>
+    <button id="loadBaseBtn" class="model-load-btn load-btn-rag">Load Base Model</button>
+    <div id="baseModelProg" class="model-prog-text"></div>
   </div>
-  <button class="load-btn" id="loadCustomBtn">Load Model</button>
-  <p class="settings-note">Leave blank to use the base Qwen2.5-1.5B model with a domain-tuned system prompt. Provide your compiled webSLM config URL to load the real fine-tuned model.</p>
+
+  <div class="settings-divider"></div>
+
+  <!-- webSLM model (Option 2 fine-tuned) -->
+  <div class="model-section">
+    <div class="model-section-header">
+      <span class="badge badge-slm">Option 2</span>
+      <span class="model-section-title">webSLM Model — fine-tuned SLM panel</span>
+    </div>
+    <select id="webslmModelSelect" disabled></select>
+    <div id="webslmModelNote" class="model-note"></div>
+    <button id="loadWebslmBtn" class="model-load-btn load-btn-slm">Load webSLM Model</button>
+    <div id="webslmModelProg" class="model-prog-text"></div>
+  </div>
+
 </div>
 
 <!-- ── Query bar ───────────────────────────────────────────────────────── -->
