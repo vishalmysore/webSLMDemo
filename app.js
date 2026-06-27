@@ -21,32 +21,21 @@ const BASE_MODELS = [
   { id: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', label: '⚠ Llama 3.2 3B',          size: '~2 GB',   safe: false },
 ];
 
-// ── webSLM model list (Option 2 — fine-tuned SLM panel) ──────────────────────
-// Custom models use appConfig to provide the HF model URL + compiled .wasm lib.
-// Models marked needsCompilation=true cannot be loaded yet; a note is shown.
+// ── webSLM model (Option 2 — fine-tuned SLM panel) ──────────────────────────
+// Only the compiled custom medical model. Right side is NOT user-selectable.
 
-const WEBSLM_MODELS = [
-  {
-    id:    'Qwen2-0.5B-Instruct-q4f16_1-MLC',
-    label: 'Qwen2 0.5B (domain-prompted base)',
-    size:  '~400 MB',
-    appConfig: null,
-    needsCompilation: false,
+const WEBSLM_MODEL = {
+  id:    'WebSLM-Custom-q4f16_1-webgpu',
+  label: 'WebSLM-Medical-0.5B ✓ compiled',
+  size:  '~293 MB',
+  appConfig: {
+    model_list: [{
+      model:     'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC',
+      model_id:  'WebSLM-Custom-q4f16_1-webgpu',
+      model_lib: 'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC/resolve/main/libs/WebSLM-Custom-q4f16_1-webgpu.wasm',
+    }],
   },
-  {
-    id:    'WebSLM-Custom-q4f16_1-webgpu',
-    label: 'WebSLM-Medical-0.5B ✓ compiled',
-    size:  '~293 MB',
-    appConfig: {
-      model_list: [{
-        model:     'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC',
-        model_id:  'WebSLM-Custom-q4f16_1-webgpu',
-        model_lib: 'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC/resolve/main/libs/WebSLM-Custom-q4f16_1-webgpu.wasm',
-      }],
-    },
-    needsCompilation: false,
-  },
-];
+};
 
 const DOMAIN_EXAMPLES = {
   insurance: [
@@ -143,15 +132,7 @@ async function init() {
   baseModelSelect.disabled = false;
   updateBaseModelNote();
 
-  // Populate webSLM model dropdown
-  WEBSLM_MODELS.forEach(m => {
-    const opt = document.createElement("option");
-    opt.value = m.id;
-    opt.textContent = `${m.label} (${m.size})`;
-    webslmModelSelect.appendChild(opt);
-  });
-  webslmModelSelect.disabled = false;
-  updateWebslmModelNote();
+  // webSLM model is fixed (no dropdown) — display note only
 
   // Render example queries
   renderExamples(currentDomain);
@@ -177,18 +158,7 @@ async function init() {
     updateBaseModelNote();
   });
 
-  // webSLM model selector change
-  webslmModelSelect.addEventListener("change", () => {
-    if (engineSLM) {
-      engineSLM.unload?.();
-      engineSLM = null;
-      webslmReady = false;
-      statusSLM.textContent = "Model changed — click Load to reload.";
-      progressSLM.style.width = "0%";
-      updateSendBtn();
-    }
-    updateWebslmModelNote();
-  });
+  // webSLM model is fixed — no change event listener needed
 
   loadBaseBtn.addEventListener("click", loadBaseModel);
   loadWebslmBtn.addEventListener("click", loadWebslmModel);
@@ -219,21 +189,7 @@ function updateBaseModelNote() {
   baseModelNote.style.color = m.safe ? "" : "#f59e0b";
 }
 
-function updateWebslmModelNote() {
-  const m = WEBSLM_MODELS.find(x => x.id === webslmModelSelect.value);
-  if (!m) return;
-  if (m.needsCompilation) {
-    webslmModelNote.textContent = m.compilationNote;
-    webslmModelNote.style.color = "#f59e0b";
-    loadWebslmBtn.disabled = true;
-  } else {
-    webslmModelNote.textContent = m.appConfig
-      ? `Custom compiled webSLM model — loads from HuggingFace (VishalMysore/WebSLM-Custom-MLC).`
-      : `Base model with domain-specialized system prompt. No separate download — shares base engine.`;
-    webslmModelNote.style.color = "#8b949e";
-    loadWebslmBtn.disabled = false;
-  }
-}
+// webSLM model note is static (no dropdown selection)
 
 async function loadBaseModel() {
   const modelId = baseModelSelect.value;
@@ -260,14 +216,7 @@ async function loadBaseModel() {
     baseModelProg.textContent = "";
     baseReady = true;
 
-    // If webSLM model is the same built-in model, mark it ready too (shared engine)
-    const wm = WEBSLM_MODELS.find(x => x.id === webslmModelSelect.value);
-    if (wm && !wm.needsCompilation && !wm.appConfig && wm.id === modelId) {
-      engineSLM = null;
-      webslmReady = true;
-      statusSLM.textContent = `✓ ${modelMeta.label} (domain-tuned prompt)`;
-      progressSLM.style.width = "100%";
-    }
+    // webSLM model is always separate (custom compiled model)
     updateSendBtn();
   } catch (err) {
     statusRAG.textContent = `Failed: ${err.message}`;
@@ -280,26 +229,9 @@ async function loadBaseModel() {
 }
 
 async function loadWebslmModel() {
-  const wm = WEBSLM_MODELS.find(x => x.id === webslmModelSelect.value);
-  if (!wm || wm.needsCompilation) return;
+  // Load the fixed compiled webSLM medical model
+  const wm = WEBSLM_MODEL;
 
-  // Same built-in model as base — share the engine, no extra download
-  if (!wm.appConfig) {
-    if (!baseReady) {
-      webslmModelNote.textContent = "Load the base model first.";
-      webslmModelNote.style.color = "#f59e0b";
-      return;
-    }
-    engineSLM = null;
-    webslmReady = true;
-    const bm = BASE_MODELS.find(m => m.id === baseModelSelect.value) || BASE_MODELS[0];
-    statusSLM.textContent = `✓ ${bm.label} (domain-tuned prompt)`;
-    progressSLM.style.width = "100%";
-    updateSendBtn();
-    return;
-  }
-
-  // Custom compiled webSLM model — load with appConfig
   loadWebslmBtn.disabled = true;
   webslmReady = false;
   updateSendBtn();
