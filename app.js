@@ -25,12 +25,13 @@ const BASE_MODELS = [
 // Only the compiled custom medical model. Right side is NOT user-selectable.
 
 const WEBSLM_MODEL = {
-  id:    'VishalMysore/WebSLM-Custom-MLC',
+  id:    'WebSLM-Custom-q4f16_1-webgpu',
   label: 'WebSLM-Medical-0.5B ✓ compiled',
   size:  '~293 MB',
   appConfig: {
     model_list: [{
-      model:     'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC',
+      model:     'VishalMysore/WebSLM-Custom-MLC',
+      model_id:  'WebSLM-Custom-q4f16_1-webgpu',
       model_lib: 'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC/resolve/main/libs/WebSLM-Custom-q4f16_1-webgpu.wasm',
     }],
   },
@@ -247,7 +248,7 @@ async function loadWebslmModel() {
   try {
     if (engineSLM) { engineSLM.unload?.(); engineSLM = null; }
     engineSLM = new webllm.MLCEngine();
-    await engineSLM.reload(wm.id, {
+    await engineSLM.reload(wm.appConfig.model_list[0].model_id, {
       appConfig: wm.appConfig,
       initProgressCallback: onProgress,
     });
