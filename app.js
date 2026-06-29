@@ -416,10 +416,12 @@ async function handleSend() {
     leftMessages  = msgs;          // base Qwen2.5-0.5B
     rightMessages = msgs;          // fine-tune
     rightEngine   = engineSLM;     // must be the fine-tune — never fall back to base here
-    // Identical low-temperature decoding for BOTH panels (so the only variable is the
-    // fine-tuning), with repetition penalties — pure greedy (temp 0) makes 0.5B models
-    // fall into degenerate repeat loops that bury the trained style.
-    opts = { temperature: 0.3, top_p: 0.9, frequency_penalty: 0.6, presence_penalty: 0.3, max_tokens: 300 };
+    // Identical decoding for BOTH panels (so the only variable is the fine-tuning).
+    // Use Qwen2.5's OWN recommended sampling (temp 0.7 / top_p 0.8, straight from its
+    // mlc-chat-config). NOTE: temp 0 made these 0.5B models loop, and adding strong
+    // frequency/presence penalties made the bilingual base drift into Chinese gibberish
+    // — normal sampling diversity is the stable choice and needs no penalties.
+    opts = { temperature: 0.7, top_p: 0.8, max_tokens: 256 };
   } else {
     // Product demo: base + RAG (left) vs domain-prompted fine-tune (right).
     const docs = retriever.retrieve(query, 3);
