@@ -8,7 +8,9 @@
  * Queries run sequentially to stay within browser GPU memory limits.
  */
 
-import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+// Pin to 0.2.79 — the web-llm runtime our .wasm was compiled against
+// (mlc-llm v0.19.0). A newer runtime can fail to instantiate the wasm (ABI drift).
+import * as webllm from "https://esm.run/@mlc-ai/web-llm@0.2.79";
 import { TFIDFRetriever } from "./rag.js";
 
 // ── Base model list (Option 1 — RAG panel) ───────────────────────────────────
@@ -30,7 +32,7 @@ const WEBSLM_MODEL = {
   size:  '~293 MB',
   appConfig: {
     model_list: [{
-      model:     'VishalMysore/WebSLM-Custom-MLC',
+      model:     'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC',
       model_id:  'WebSLM-Custom-q4f16_1-webgpu',
       model_lib: 'https://huggingface.co/VishalMysore/WebSLM-Custom-MLC/resolve/main/libs/WebSLM-Custom-q4f16_1-webgpu.wasm',
     }],
