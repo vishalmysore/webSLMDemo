@@ -39,6 +39,29 @@ const WEBSLM_MODEL = {
   },
 };
 
+// ── Fine-tuning proof mode ──────────────────────────────────────────────────
+// A controlled A/B: the SAME base our fine-tune started from (same q4f16_1 quant,
+// a WebLLM prebuilt) vs the fine-tune itself. Identical system prompt (the one the
+// model was actually TRAINED with) + greedy decoding → the only variable is the
+// LoRA training, so any difference is attributable to fine-tuning.
+const FINETUNE_BASE_MODEL_ID = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+
+// The system prompt from finetune/data/medical.jsonl — using it is what surfaces
+// the fine-tuned behaviour (concise, plain language, "consult a professional").
+const TRAINING_SYSTEM_PROMPT =
+  "You are a careful medical information assistant. Provide general, educational " +
+  "health information in plain language, and always recommend consulting a licensed " +
+  "healthcare professional for diagnosis or treatment.";
+
+// ✓ trained = present in the training set (strongest signal); the rest are held-out
+// (test whether the trained STYLE generalises to unseen questions).
+const PROOF_EXAMPLES = [
+  { q: "What are common signs of dehydration?",   trained: true  },
+  { q: "Do antibiotics treat the flu?",           trained: true  },
+  { q: "When is chest pain a medical emergency?", trained: true  },
+  { q: "How should I use ibuprofen safely?",      trained: false },
+];
+
 const DOMAIN_EXAMPLES = {
   insurance: [
     "What does comprehensive auto coverage include?",
@@ -76,6 +99,8 @@ let currentDomain = "insurance";
 let isGenerating  = false;
 let baseReady  = false;
 let webslmReady = false;
+let mode = "product";        // "product" (Base+RAG vs SLM) | "proof" (Base vs Fine-tune)
+let baseLoadedId = null;     // which model id the base engine currently holds
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +118,14 @@ const retrievedDocs = $("retrievedDocs");
 const exampleBtns   = $("exampleBtns");
 const settingsToggle = $("settingsToggle");
 const settingsPanel  = $("settingsPanel");
+const modeToggle     = $("modeToggle");
+const examplesLabel  = $("examplesLabel");
+const badgeRAG       = $("badgeRAG");
+const badgeSLM       = $("badgeSLM");
+const panelTitleRAG  = $("panelTitleRAG");
+const panelSubRAG    = $("panelSubRAG");
+const panelTitleSLM  = $("panelTitleSLM");
+const panelSubSLM    = $("panelSubSLM");
 // Base model controls
 const baseModelSelect  = $("baseModelSelect");
 const loadBaseBtn      = $("loadBaseBtn");
@@ -107,16 +140,15 @@ const webslmModelProg   = $("webslmModelProg");
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
-  // Check WebGPU availability
-  if (!navigator.gpu) {
+  // WebGPU is required to RUN models, but not to explore the UI (mode toggle,
+  // examples, settings). Warn + disable loading, but don't bail — keep the page usable.
+  const webgpuOK = !!navigator.gpu;
+  if (!webgpuOK) {
     const msg = "WebGPU not supported — use Chrome 113+, Edge 113+, or Firefox Nightly with WebGPU enabled.";
     statusRAG.textContent = msg;
     statusSLM.textContent = msg;
     statusRAG.style.color = "#ef4444";
     statusSLM.style.color = "#ef4444";
-    loadBaseBtn.disabled  = true;
-    loadWebslmBtn.disabled = true;
-    return;
   }
 
   // Load knowledge base
@@ -131,7 +163,7 @@ async function init() {
     opt.textContent = `${m.label} (${m.size})`;
     baseModelSelect.appendChild(opt);
   });
-  baseModelSelect.disabled = false;
+  baseModelSelect.disabled = !webgpuOK;
   updateBaseModelNote();
 
   // webSLM model is fixed (no dropdown) — display note only
@@ -144,6 +176,11 @@ async function init() {
     settingsPanel.classList.toggle("open")
   );
 
+  // Mode toggle (Product demo ↔ Fine-tuning proof)
+  modeToggle.querySelectorAll("button").forEach(btn =>
+    btn.addEventListener("click", () => setMode(btn.dataset.mode))
+  );
+
   // Open settings on first load so users see the model selectors
   settingsPanel.classList.add("open");
 
@@ -153,6 +190,7 @@ async function init() {
       engine.unload?.();
       engine = null;
       baseReady = false;
+      baseLoadedId = null;
       statusRAG.textContent = "Model changed — click Load to reload.";
       progressRAG.style.width = "0%";
       updateSendBtn();
@@ -164,14 +202,14 @@ async function init() {
 
   loadBaseBtn.addEventListener("click", loadBaseModel);
   loadWebslmBtn.addEventListener("click", loadWebslmModel);
+  loadBaseBtn.disabled   = !webgpuOK;
+  loadWebslmBtn.disabled = !webgpuOK;
 
   domainSelect.addEventListener("change", e => {
     currentDomain = e.target.value;
     retriever = new TFIDFRetriever(knowledgeBase[currentDomain] || []);
     renderExamples(currentDomain);
-    retrievedDocs.innerHTML = "";
-    historyRAG.innerHTML = "";
-    historySLM.innerHTML = "";
+    clearPanels();
   });
 
   sendBtn.addEventListener("click", handleSend);
@@ -193,13 +231,91 @@ function updateBaseModelNote() {
 
 // webSLM model note is static (no dropdown selection)
 
+// Remove chat bubbles from both panels but PRESERVE the #retrievedDocs container
+// (it lives inside #historyRAG; innerHTML="" would detach the cached reference).
+function clearPanels() {
+  historyRAG.querySelectorAll(".chat-message").forEach(n => n.remove());
+  historySLM.querySelectorAll(".chat-message").forEach(n => n.remove());
+  retrievedDocs.innerHTML = "";
+}
+
+// Switch between "product" (Base+RAG vs Fine-tuned SLM) and "proof"
+// (identical base vs fine-tune, same training prompt, greedy decoding).
+function setMode(m) {
+  if (m === mode) return;
+  mode = m;
+  const proof = m === "proof";
+
+  modeToggle.querySelectorAll("button").forEach(b =>
+    b.classList.toggle("active", b.dataset.mode === m));
+
+  // RAG controls (domain + retrieved docs) only apply to product mode.
+  domainSelect.style.display = proof ? "none" : "";
+
+  if (proof) {
+    badgeRAG.textContent = "Base";
+    badgeSLM.textContent = "Fine-tuned";
+    panelTitleRAG.textContent = "Qwen2.5-0.5B-Instruct — base";
+    panelSubRAG.textContent   = "Same base • NO fine-tuning • same training prompt • greedy";
+    panelTitleSLM.textContent = "WebSLM-Medical-0.5B — fine-tuned";
+    panelSubSLM.textContent   = "Same base + your LoRA training • same prompt • greedy";
+    examplesLabel.textContent = "Try (✓ = seen in training):";
+    baseModelNote.textContent = "Proof mode: base is fixed to Qwen2.5-0.5B-Instruct — the exact base your fine-tune started from.";
+    baseModelNote.style.color = "";
+    renderProofExamples();
+  } else {
+    badgeRAG.textContent = "Option 1";
+    badgeSLM.textContent = "Option 2";
+    panelTitleRAG.textContent = "Base + RAG";
+    panelSubRAG.textContent   = "General model • Documents retrieved and injected into context";
+    panelTitleSLM.textContent = "Fine-tuned webSLM";
+    panelSubSLM.textContent   = "Domain-specialized model • No retrieval • Behaviour baked in during training";
+    examplesLabel.textContent = "Try:";
+    updateBaseModelNote();
+    renderExamples(currentDomain);
+  }
+
+  // The BASE model differs between modes; if the loaded one no longer matches what
+  // this mode needs, drop it and require a reload so we never compare the wrong base.
+  const neededBase = proof ? FINETUNE_BASE_MODEL_ID : baseModelSelect.value;
+  if (baseLoadedId !== neededBase) {
+    if (engine) { engine.unload?.(); engine = null; }
+    baseReady = false;
+    baseLoadedId = null;
+    progressRAG.style.width = "0%";
+    statusRAG.style.color = "";
+    statusRAG.textContent = proof
+      ? "Proof mode — click Load Base Model (loads Qwen2.5-0.5B base)."
+      : "Mode changed — click Load Base Model.";
+  }
+
+  clearPanels();
+  updateSendBtn();
+}
+
+function renderProofExamples() {
+  exampleBtns.innerHTML = PROOF_EXAMPLES
+    .map(e => `<button class="example-btn" data-q="${e.q}">${e.trained ? "✓ " : ""}${e.q}</button>`)
+    .join("");
+  exampleBtns.querySelectorAll(".example-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      queryInput.value = btn.dataset.q;
+      queryInput.focus();
+    });
+  });
+}
+
 async function loadBaseModel() {
-  const modelId = baseModelSelect.value;
-  const modelMeta = BASE_MODELS.find(m => m.id === modelId) || BASE_MODELS[0];
+  const proof = mode === "proof";
+  // Proof mode forces the exact base the fine-tune started from (apples-to-apples).
+  const modelId = proof ? FINETUNE_BASE_MODEL_ID : baseModelSelect.value;
+  const label = proof
+    ? "Qwen2.5-0.5B-Instruct (base)"
+    : (BASE_MODELS.find(m => m.id === modelId) || BASE_MODELS[0]).label;
   loadBaseBtn.disabled = true;
   baseReady = false;
   updateSendBtn();
-  statusRAG.textContent = `Loading ${modelMeta.label}…`;
+  statusRAG.textContent = `Loading ${label}…`;
   progressRAG.style.width = "0%";
   statusRAG.style.color = "";
 
@@ -213,12 +329,11 @@ async function loadBaseModel() {
     if (engine) { engine.unload?.(); engine = null; }
     engine = new webllm.MLCEngine({ initProgressCallback: onProgress });
     await engine.reload(modelId);
-    statusRAG.textContent = `✓ ${modelMeta.label} + RAG`;
+    baseLoadedId = modelId;
+    statusRAG.textContent = proof ? `✓ ${label}` : `✓ ${label} + RAG`;
     progressRAG.style.width = "100%";
     baseModelProg.textContent = "";
     baseReady = true;
-
-    // webSLM model is always separate (custom compiled model)
     updateSendBtn();
   } catch (err) {
     statusRAG.textContent = `Failed: ${err.message}`;
@@ -287,57 +402,70 @@ async function handleSend() {
   appendMessage(historyRAG, "user", query);
   appendMessage(historySLM, "user", query);
 
-  // Retrieve relevant docs for Option 1
-  const docs = retriever.retrieve(query, 3);
-  renderRetrievedDocs(docs);
+  let leftMessages, rightMessages, rightEngine, opts;
 
-  // Build Option 1 messages (base + RAG context)
-  const contextBlock = docs.length > 0
-    ? `Relevant reference material:\n\n${docs.map(d =>
-        `[${d.doc.title}]\n${d.doc.content}`
-      ).join("\n\n")}\n\n---\nUsing the above material where relevant, answer the following question:`
-    : null;
-
-  const ragMessages = [
-    {
-      role: "system",
-      content: "You are a helpful general-purpose assistant. When reference material is provided, use it to give accurate and grounded answers. If no relevant material is available, answer based on general knowledge.",
-    },
-    {
-      role: "user",
-      content: contextBlock ? `${contextBlock}\n\n${query}` : query,
-    },
-  ];
-
-  // Build Option 2 messages (domain-specialized prompt, no retrieval)
-  const slmMessages = [
-    { role: "system", content: DOMAIN_SYSTEM_PROMPTS[currentDomain] },
-    { role: "user", content: query },
-  ];
+  if (mode === "proof") {
+    // Controlled A/B: BOTH sides get the identical training system prompt, no RAG,
+    // and greedy decoding. The only variable left is the LoRA fine-tuning, so any
+    // difference between the panels is attributable to training.
+    retrievedDocs.innerHTML = "";
+    const msgs = [
+      { role: "system", content: TRAINING_SYSTEM_PROMPT },
+      { role: "user",   content: query },
+    ];
+    leftMessages  = msgs;          // base Qwen2.5-0.5B
+    rightMessages = msgs;          // fine-tune
+    rightEngine   = engineSLM;     // must be the fine-tune — never fall back to base here
+    // Identical low-temperature decoding for BOTH panels (so the only variable is the
+    // fine-tuning), with repetition penalties — pure greedy (temp 0) makes 0.5B models
+    // fall into degenerate repeat loops that bury the trained style.
+    opts = { temperature: 0.3, top_p: 0.9, frequency_penalty: 0.6, presence_penalty: 0.3, max_tokens: 300 };
+  } else {
+    // Product demo: base + RAG (left) vs domain-prompted fine-tune (right).
+    const docs = retriever.retrieve(query, 3);
+    renderRetrievedDocs(docs);
+    const contextBlock = docs.length > 0
+      ? `Relevant reference material:\n\n${docs.map(d =>
+          `[${d.doc.title}]\n${d.doc.content}`
+        ).join("\n\n")}\n\n---\nUsing the above material where relevant, answer the following question:`
+      : null;
+    leftMessages = [
+      { role: "system", content: "You are a helpful general-purpose assistant. When reference material is provided, use it to give accurate and grounded answers. If no relevant material is available, answer based on general knowledge." },
+      { role: "user",   content: contextBlock ? `${contextBlock}\n\n${query}` : query },
+    ];
+    rightMessages = [
+      { role: "system", content: DOMAIN_SYSTEM_PROMPTS[currentDomain] },
+      { role: "user",   content: query },
+    ];
+    rightEngine = engineSLM || engine;
+    opts = { temperature: 0.7, top_p: 0.95, max_tokens: 512 };
+  }
 
   // Show thinking indicators
   const ragThinking = appendThinking(historyRAG);
   const slmThinking = appendThinking(historySLM);
 
-  // Option 1 — Base + RAG (runs first on the shared engine)
-  await streamResponse(engine, ragMessages, historyRAG, ragThinking);
-
-  // Option 2 — Fine-tuned SLM or domain-prompted base
-  const activeEngine = engineSLM || engine;
-  await streamResponse(activeEngine, slmMessages, historySLM, slmThinking);
+  // Left runs first (shared GPU; sequential to stay within browser memory limits).
+  await streamResponse(engine, leftMessages, historyRAG, ragThinking, opts);
+  await streamResponse(rightEngine, rightMessages, historySLM, slmThinking, opts);
 
   isGenerating = false;
   sendBtn.disabled = false;
   updateSendBtn();
 }
 
-async function streamResponse(eng, messages, historyEl, thinkingEl) {
+async function streamResponse(eng, messages, historyEl, thinkingEl, opts = {}) {
+  const { temperature = 0.7, top_p = 0.95, max_tokens = 512,
+          frequency_penalty = 0, presence_penalty = 0 } = opts;
   try {
     const stream = await eng.chat.completions.create({
       messages,
       stream: true,
-      temperature: 0.7,
-      max_tokens: 512,
+      temperature,
+      top_p,
+      max_tokens,
+      frequency_penalty,
+      presence_penalty,
     });
 
     thinkingEl.remove();

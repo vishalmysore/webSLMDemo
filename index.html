@@ -71,6 +71,28 @@
 
     .settings-btn:hover { border-color: var(--slm); color: var(--text); }
 
+    /* ── Header right + mode toggle ───────────────────────────────── */
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    .mode-toggle {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .mode-toggle button {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .mode-toggle button.active { background: var(--slm); color: #0d1117; }
+    .mode-toggle button:not(.active):hover { color: var(--text); }
+
     /* ── Settings panel ───────────────────────────────────────────── */
     .settings-panel {
       display: none;
@@ -423,7 +445,13 @@
     <h1>webSLM Demo &mdash; <span class="rag-word">Base + RAG</span> vs <span class="slm-word">Fine-tuned SLM</span></h1>
     <p>100% in-browser inference via WebGPU &bull; No server required &bull; Powered by WebLLM &amp; MLC-LLM</p>
   </div>
-  <button class="settings-btn" id="settingsToggle">&#9881; Settings</button>
+  <div class="header-right">
+    <div class="mode-toggle" id="modeToggle">
+      <button data-mode="product" class="active">Product demo</button>
+      <button data-mode="proof">Fine-tuning proof</button>
+    </div>
+    <button class="settings-btn" id="settingsToggle">&#9881; Settings</button>
+  </div>
 </header>
 
 <!-- ── Settings ────────────────────────────────────────────────────────── -->
@@ -470,7 +498,7 @@
 
 <!-- ── Example queries ─────────────────────────────────────────────────── -->
 <div class="examples-bar">
-  <span class="examples-label">Try:</span>
+  <span class="examples-label" id="examplesLabel">Try:</span>
   <div id="exampleBtns"></div>
 </div>
 
@@ -480,10 +508,10 @@
   <!-- Left: Base Model + RAG -->
   <div class="panel">
     <div class="panel-header">
-      <span class="badge badge-rag">Option 1</span>
+      <span class="badge badge-rag" id="badgeRAG">Option 1</span>
       <div>
-        <div class="panel-title">Base Qwen2.5-1.5B + RAG</div>
-        <div class="panel-subtitle">General model &bull; Documents retrieved and injected into context</div>
+        <div class="panel-title" id="panelTitleRAG">Base + RAG</div>
+        <div class="panel-subtitle" id="panelSubRAG">General model &bull; Documents retrieved and injected into context</div>
       </div>
     </div>
     <div class="status-strip">
@@ -501,10 +529,10 @@
   <!-- Right: Fine-tuned webSLM -->
   <div class="panel">
     <div class="panel-header">
-      <span class="badge badge-slm">Option 2</span>
+      <span class="badge badge-slm" id="badgeSLM">Option 2</span>
       <div>
-        <div class="panel-title">Fine-tuned webSLM</div>
-        <div class="panel-subtitle">Domain-specialized model &bull; No retrieval &bull; Behaviour baked in during training</div>
+        <div class="panel-title" id="panelTitleSLM">Fine-tuned webSLM</div>
+        <div class="panel-subtitle" id="panelSubSLM">Domain-specialized model &bull; No retrieval &bull; Behaviour baked in during training</div>
       </div>
     </div>
     <div class="status-strip">
