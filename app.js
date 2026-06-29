@@ -209,8 +209,8 @@ async function loadBaseModel() {
 
   try {
     if (engine) { engine.unload?.(); engine = null; }
-    engine = new webllm.MLCEngine();
-    await engine.reload(modelId, { initProgressCallback: onProgress });
+    engine = new webllm.MLCEngine({ initProgressCallback: onProgress });
+    await engine.reload(modelId);
     statusRAG.textContent = `✓ ${modelMeta.label} + RAG`;
     progressRAG.style.width = "100%";
     baseModelProg.textContent = "";
@@ -247,11 +247,15 @@ async function loadWebslmModel() {
 
   try {
     if (engineSLM) { engineSLM.unload?.(); engineSLM = null; }
-    engineSLM = new webllm.MLCEngine();
-    await engineSLM.reload(wm.appConfig.model_list[0].model_id, {
+    // appConfig + initProgressCallback go in the ENGINE constructor.
+    // reload()'s 2nd arg is ChatOptions and has no appConfig field — passing it
+    // there is silently ignored, so the engine never learns about the custom
+    // model and throws "Cannot find model record in appConfig for …".
+    engineSLM = new webllm.MLCEngine({
       appConfig: wm.appConfig,
       initProgressCallback: onProgress,
     });
+    await engineSLM.reload(wm.appConfig.model_list[0].model_id);
     statusSLM.textContent = `✓ ${wm.label}`;
     progressSLM.style.width = "100%";
     webslmModelProg.textContent = "";
